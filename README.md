@@ -63,7 +63,7 @@ npm run dev:teamsfx
 
 Both options will open the Microsoft 365 Agents Playground or make the bot available for testing in Teams. The app's Teams app id appears in `env/.env.dev` (set during provisioning) as `TEAMS_APP_ID` and is used for launching the app in Teams.
 
-## 4) Test JIRA integration
+## 4) Test JIRA integration --> TO DO (Should be taken as a pending task)
 Once the agent is running, you can interact with it via the Playground or Teams. Example messages to test:
 
 - `/fetchAC <JIRA_ID>` — fetch acceptance criteria from a JIRA issue
@@ -74,7 +74,7 @@ Once the agent is running, you can interact with it via the Playground or Teams.
 
 The agent will call the configured JIRA instance using the credentials you added to `env/.env.dev`.
 
-## 5) Implementation details & AC scoring logic
+## 5) Implementation details & AC scoring logic (Scoring Logic used in VScode Extension Agent)
 The AC scoring uses 4 dimensions (each scored 1..5):
 
 1. Clarity — how clear, unambiguous, and easy to understand the AC is
