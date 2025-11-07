@@ -1,62 +1,109 @@
-# Overview of the Basic AI Chatbot template
+# Microsoft 365 Agent (Teams) — Local Development Guide
 
-This app template is built on top of [Teams AI library V2](https://aka.ms/teams-ai-library-v2).
-It showcases an agent app that responds to user questions like ChatGPT. This enables your users to talk with the AI agent in Teams.
+This repository contains a Microsoft 365 / Teams agent built with the Microsoft 365 Agents Toolkit. The instructions below explain how to set up the project locally, add your JIRA credentials, install dependencies, and run the agent from VS Code (Run & Debug) or using the provided VS Code tasks.
 
-## Get started with the template
+## Quick overview
+- Install dependencies
+- Add your JIRA credentials to the environment file
+- Launch the agent using VS Code Run & Debug or Tasks
 
-> **Prerequisites**
->
-> To run the template in your local dev machine, you will need:
->
-> - [Node.js](https://nodejs.org/), supported versions: 20, 22.
-> - [Microsoft 365 Agents Toolkit Visual Studio Code Extension](https://aka.ms/teams-toolkit) latest version or [Microsoft 365 Agents Toolkit CLI](https://aka.ms/teamsfx-toolkit-cli).
-> - An account with [OpenAI](https://platform.openai.com/).
+## Prerequisites
+- Node.js (recommended versions: Node 20 or 22)
+- npm (comes with Node.js)
+- VS Code with the Microsoft 365 Agents Toolkit extension (Teams Toolkit)
+- A JIRA (Atlassian) Cloud account and an API token
 
-> For local debugging using Microsoft 365 Agents Toolkit CLI, you need to do some extra steps described in [Set up your Microsoft 365 Agents Toolkit CLI for local debugging](https://aka.ms/teamsfx-cli-debugging).
+## 1) Install dependencies
+Open a terminal in the project root and run:
 
-1. First, select the Microsoft 365 Agents Toolkit icon on the left in the VS Code toolbar.
-1. In file *env/.env.playground.user*, fill in your OpenAI key `SECRET_OPENAI_API_KEY=<your-key>`.
-1. Press F5 to start debugging which launches your app in Microsoft 365 Agents Playground using a web browser. Select `Debug in Microsoft 365 Agents Playground`.
-1. You can send any message to get a response from the agent.
+```bash
+npm install
+```
 
-**Congratulations**! You are running an application that can now interact with users in Microsoft 365 Agents Playground:
+This installs runtime dependencies and type packages. If you add or update packages, re-run `npm install`.
 
-![Basic AI Chatbot](https://github.com/user-attachments/assets/984af126-222b-4c98-9578-0744790b103a)
+## 2) Add JIRA credentials (local env)
+The project reads environment variables from `env/.env.dev` (used for local development) — add your JIRA details there.
 
-## What's included in the template
+Open `env/.env.dev` and set the following values (do NOT commit production secrets):
 
-| Folder       | Contents                                            |
-| - | - |
-| `.vscode`    | VSCode files for debugging                          |
-| `appPackage` | Templates for the application manifest        |
-| `env`        | Environment files                                   |
-| `infra`      | Templates for provisioning Azure resources          |
-| `src`        | The source code for the application                 |
+```bash
+# JIRA configuration (example)
+JIRA_BASE_URL=rishi1729.atlassian.net    # or https://your-domain.atlassian.net
+JIRA_API_TOKEN=<your-atlassian-api-token>
+JIRA_EMAIL=you@example.com
+JIRA_PROJECT=YOUR_PROJECT_KEY
+```
 
-The following files can be customized and demonstrate an example implementation to get you started.
+Notes:
+- You can generate an Atlassian API token from https://id.atlassian.com/manage-profile/security/api-tokens
+- Keep `env/.env.dev` out of version control (the repo currently contains one for demo/testing). If you accidentally committed secrets, rotate the API token immediately and remove the file from Git history.
 
-| File                                 | Contents                                           |
-| - | - |
-|`src/index.ts`| Application entry point. |
-|`src/config.ts`| Defines the environment variables.|
-|`src/app/instructions.txt`| Defines the prompt.|
-|`src/app/app.ts`| Handles business logics for the Basic AI Chatbot.|
+If you want to test against the Microsoft 365 Agents Playground, also check `env/.env.playground.user`.
 
-The following are Microsoft 365 Agents Toolkit specific project files. You can [visit a complete guide on Github](https://github.com/OfficeDev/TeamsFx/wiki/Teams-Toolkit-Visual-Studio-Code-v5-Guide#overview) to understand how Microsoft 365 Agents Toolkit works.
+## 3) Launching the agent (two options)
 
-| File                                 | Contents                                           |
-| - | - |
-|`m365agents.yml`|This is the main Microsoft 365 Agents Toolkit project file. The project file defines two primary things:  Properties and configuration Stage definitions. |
-|`m365agents.local.yml`|This overrides `m365agents.yml` with actions that enable local execution and debugging.|
-|`m365agents.playground.yml`| This overrides `m365agents.yml` with actions that enable local execution and debugging in Microsoft 365 Agents Playground.|
+Option A — Use the Teams Toolkit / VS Code Tasks (recommended for local dev):
 
-## Extend the template
+1. Open the Command Palette (Cmd+Shift+P / Ctrl+Shift+P)
+2. Run `Tasks: Run Task`
+3. Choose `Start Agent Locally` to run the full local workflow (validate prerequisites, local tunnel, provision (local), deploy, start the app).
 
-To extend the Basic AI Chatbot template with more AI capabilities, explore [Teams AI library V2 documentation](https://aka.ms/m365-agents-toolkit/teams-agent-extend-ai).
+There are several other tasks available in `.vscode/tasks.json`, for example:
+- `Start local tunnel` — opens the dev tunnel used by the bot endpoint
+- `Provision` / `Deploy` — local provisioning and deploy steps
+- `Start application` — runs `npm run dev:teamsfx` (starts the agent process)
 
-## Additional information and references
+Option B — Run the dev script directly
 
-- [Microsoft 365 Agents Toolkit Documentations](https://docs.microsoft.com/microsoftteams/platform/toolkit/teams-toolkit-fundamentals)
-- [Microsoft 365 Agents Toolkit CLI](https://aka.ms/teamsfx-toolkit-cli)
-- [Microsoft 365 Agents Toolkit Samples](https://github.com/OfficeDev/TeamsFx-Samples)
+```bash
+# start the local Teams agent and related dev servers
+npm run dev:teamsfx
+```
+
+Both options will open the Microsoft 365 Agents Playground or make the bot available for testing in Teams. The app's Teams app id appears in `env/.env.dev` (set during provisioning) as `TEAMS_APP_ID` and is used for launching the app in Teams.
+
+## 4) Test JIRA integration
+Once the agent is running, you can interact with it via the Playground or Teams. Example messages to test:
+
+- `/fetchAC <JIRA_ID>` — fetch acceptance criteria from a JIRA issue
+- `/scoreSC <JIRA_ID>` — fetch and score the acceptance criteria
+- `/scoreThisAC <acceptance criteria text>` — score a provided AC text
+- `/reviseAC <JIRA_ID>` — fetch and return a revised AC
+- `/scoreBulk` — score ACs from an Excel file (requires uploading/processing)
+
+The agent will call the configured JIRA instance using the credentials you added to `env/.env.dev`.
+
+## 5) Implementation details & AC scoring logic
+The AC scoring uses 4 dimensions (each scored 1..5):
+
+1. Clarity — how clear, unambiguous, and easy to understand the AC is
+2. Structure — whether it follows Given/When/Then or other agreed conventions
+3. Relevance — how well the AC maps to the story summary/description
+4. Testability — how easy it is to verify (clear test steps or acceptance conditions)
+
+Overall score = average of the four category scores. Pass when average >= 4, otherwise Fail.
+
+The agent exposes commands that let users fetch and score AC from JIRA or submit AC text directly for scoring.
+
+## 6) Troubleshooting
+- If the agent complains about missing env vars (e.g. `TEAMS_APP_ID`), ensure `env/.env.dev` has those values or run the toolkit `Provision` / `Start Agent Locally` tasks which populate them during debug/provisioning.
+- If JIRA connection fails:
+  - Confirm `JIRA_EMAIL`, `JIRA_API_TOKEN`, and `JIRA_PROJECT` are correct.
+  - Verify you can call the JIRA API directly using curl (example):
+
+```bash
+curl -u you@example.com:<api_token> -X GET "https://your-domain.atlassian.net/rest/api/3/myself"
+```
+
+## 7) Security note
+- Do not commit real API tokens to source control. If a secret is accidentally committed, rotate the token immediately.
+- Consider adding `env/.env.dev` to `.gitignore` and store secrets in environment variables or a secrets manager.
+
+## 8) Want me to help?
+- I can: remove `env/.env.dev` from Git and replace it with `env/.env.example`; help you add a `.env.example`; or add a README section with troubleshooting logs. Tell me which you'd like me to do next.
+
+---
+
+Last updated: November 2025
+Temporary placeholder
