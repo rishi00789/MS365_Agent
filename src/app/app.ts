@@ -9,6 +9,9 @@ import * as path from 'path';
 import config from "../config";
 import { jiraConfig } from "../config/jira.config";
 import JiraClient from 'jira-client';
+import { scoreAcceptanceCriteria } from '../utils/scoreAc'; 
+import {jiraFields} from '../constant/constant';
+import util from "util";
 
 console.log('Initializing JIRA client with config:', {
     host: jiraConfig.baseUrl,
@@ -150,7 +153,8 @@ app.on('message', async ({ send, stream, activity }) => {
     if (activity.text.toLowerCase().includes('jira') || 
         activity.text.toLowerCase().includes('story') || 
         activity.text.toLowerCase().includes('sprint') ||
-        activity.text.toLowerCase().includes('task')) {
+        activity.text.toLowerCase().includes('task') ||
+        activity.text.toLowerCase().startsWith('readDescription')){
       const jiraResponse = await handleJiraQuery(activity.text);
       messages.push({ role: 'assistant', content: jiraResponse });
       if (activity.conversation.isGroup) {
@@ -162,6 +166,145 @@ app.on('message', async ({ send, stream, activity }) => {
       storage.set(conversationKey, messages);
       return;
     }
+
+    // Helper function to format score response
+    function formatScoreResponse(result: any): string {
+      let text = typeof result === 'string' ? result : (result.text || '');
+      
+      // Remove escaped characters and extra symbols
+      text = text.replace(/\\n/g, '\n').replace(/\\t/g, '').replace(/'/g, '').replace(/\+/g, '');
+      
+      // Split by lines and process
+      const lines = text.split('\n');
+      let formatted = '';
+      
+      lines.forEach((line: string) => {
+        const trimmed = line.trim();
+        
+        // Skip empty lines and dashes
+        if (!trimmed || trimmed === '---') return;
+        
+        // Main headers
+        if (trimmed.startsWith('###')) {
+          formatted += `<br><br><b>${trimmed.replace(/#{1,}/g, '').trim()}</b><br>`;
+        }
+        // Section titles (Clarity, Structure, Relevance, Testability, Overall Score, etc.)
+        else if (trimmed.match(/^-?[A-Z][a-zA-Z\s]+$/) && 
+                 !trimmed.startsWith('Score') && 
+                 !trimmed.startsWith('Explanation') && 
+                 !trimmed.startsWith('Summary') &&
+                 !trimmed.startsWith('Given') &&
+                 !trimmed.startsWith('When') &&
+                 !trimmed.startsWith('Then')) {
+          formatted += `<br><b>📌 ${trimmed}</b><br>`;
+        }
+        // Score and Explanation lines
+        else if (trimmed.startsWith('Score') || 
+                 trimmed.startsWith('Explanation') || 
+                 trimmed.startsWith('Summary')) {
+          if (trimmed.startsWith('Score')) {
+            formatted += `<i>${trimmed}</i><br>`;
+          } else {
+            formatted += `${trimmed}<br>`;
+          }
+        }
+        // Any other non-empty line
+        else if (trimmed) {
+          formatted += `${trimmed}<br>`;
+        }
+      });
+      
+      return formatted;
+    }
+
+    // Command: /scoreAC - Fetch and score acceptance criteria from JIRA
+    if (activity.text.toLowerCase().startsWith('/scoreac')) {
+  const issueKey = activity.text.split(' ')[1];
+  if (!issueKey) {
+    stream.emit("Please provide a JIRA issue key like `/scoreAC ABC-123`");
+    return;
+  }
+
+  try {
+    const issue = await jira.findIssue(issueKey);
+    const fields = await jira.listFields();
+    console.log(fields);
+
+    const description = issue.fields[jiraFields.AC]?.content?.map((block: any) =>
+      block.content?.map((c: any) => c.text).join(' ')
+    ).join('\n') || 'No description found.';
+    
+       
+    if(description==='No description found.'){
+      stream.emit(`❌ No acceptance criteria found for issue ${issueKey}. Please check the key and try again.`);
+      return;
+    }else{
+    const result = await scoreAcceptanceCriteria(description );
+    stream.emit(`✅ Fetched and scoring acceptance criteria for issue ${issueKey}`);
+      stream.emit(`<br><b>📋 Acceptance Criteria:</b><br>${description}`);
+      
+      const formattedScore = formatScoreResponse(result);
+      stream.emit(`<br><b>🎯 Score Assessment:</b>${formattedScore}`);
+      stream.emit(new MessageActivity().addAiGenerated().addFeedback());
+    }
+  } catch (err) {
+    console.error(err);
+    stream.emit(`❌ Failed to fetch description for issue ${issueKey}. Please check the key and try again.`);
+  }
+  return;
+}
+
+    // Command: /fetchAC - Fetch acceptance criteria from JIRA without scoring
+    if (activity.text.toLowerCase().startsWith('/fetchac')) {
+  const issueKey = activity.text.split(' ')[1];
+  if (!issueKey) {
+    stream.emit("Please provide a JIRA issue key like `/fetchAC ABC-123`");
+    return;
+  }
+
+  try {
+    const issue = await jira.findIssue(issueKey);
+    const description = issue.fields[jiraFields.AC]?.content?.map((block: any) =>
+      block.content?.map((c: any) => c.text).join(' ')
+    ).join('\n') || 'No description found.';
+    
+    if(description==='No description found.'){
+      stream.emit(`❌ No acceptance criteria found for issue ${issueKey}. Please check the key and try again.`);
+      return;
+    }else{
+      stream.emit(`✅ Fetched acceptance criteria for issue ${issueKey}`);
+      stream.emit(`<br><b>📋 Acceptance Criteria:</b><br>${description}`);
+      stream.emit(new MessageActivity().addAiGenerated().addFeedback());
+    }
+  } catch (err) {
+    console.error(err);
+    stream.emit(`❌ Failed to fetch acceptance criteria for issue ${issueKey}. Please check the key and try again.`);
+  }
+  return;
+}
+    // Command: /scoreThisAC - Score provided acceptance criteria string
+    if (activity.text.toLowerCase().startsWith('/scorethisac')) {
+  const acString = activity.text.substring('/scorethisac'.length).trim();
+  if (!acString) {
+    stream.emit("Please provide acceptance criteria to score. Example: `/scoreThisAC Given a user login page, when user enters valid credentials, then user should be logged in`");
+    return;
+  }
+
+  try {
+    const result = await scoreAcceptanceCriteria(acString);
+    stream.emit(`Scoring provided acceptance criteria...`);
+    stream.emit(`<br><b>📋 Acceptance Criteria:</b><br>${acString}`);
+    
+    const formattedScore = formatScoreResponse(result);
+    stream.emit(`<br><b>🎯 Score Assessment:</b>${formattedScore}`);
+    stream.emit(new MessageActivity().addAiGenerated().addFeedback());
+  } catch (err) {
+    console.error(err);
+    stream.emit(`❌ Failed to score the provided acceptance criteria. Please try again.`);
+  }
+  return;
+}
+
 
     const prompt = new ChatPrompt({
       messages,
